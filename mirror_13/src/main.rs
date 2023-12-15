@@ -53,6 +53,24 @@ use std::io::prelude::*;
 //         None
 //     }
 // }
+fn compare(a: &[&str], b: &[&str], differences: usize) -> bool {
+    let mut total = 0;
+    for i in 0..a.len() {
+        let diff = a[i]
+            .chars()
+            .zip(b[i].chars())
+            .filter(|(x, y)| x != y)
+            .count();
+        if diff > differences {
+            return false;
+        }
+        total += diff;
+        if total > differences {
+            return false;
+        }
+    }
+    total == differences
+}
 fn mirror_axis(data: Vec<&str>) -> Option<usize> {
     let mut found: Option<(usize, usize)> = None;
     for i in 1..data.len() {
@@ -65,7 +83,8 @@ fn mirror_axis(data: Vec<&str>) -> Option<usize> {
             .map(|h| *h)
             .collect::<Vec<&str>>();
         let rev = rev.as_slice();
-        if &data[i - len..i] == rev {
+        // if &data[i - len..i] == rev {
+        if compare(&data[i - len..i], rev, 1) {
             found = match found {
                 Some((oldlen, _)) if oldlen > len => found,
                 _ => Some((len, i)),
