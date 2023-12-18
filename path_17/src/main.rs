@@ -1,5 +1,5 @@
 use std::cmp::max;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
 use std::io::prelude::*;
 const DIRECTIONS: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
@@ -73,11 +73,11 @@ impl Direction {
         max: &(usize, usize),
     ) -> Option<(usize, usize)> {
         match self {
-            Direction::Left if coords.0 > len => Some((coords.0 - len, coords.1)),
+            Direction::Left if coords.0 >= len => Some((coords.0 - len, coords.1)),
             Direction::Right if len <= max.0 && coords.0 <= max.0 - len => {
                 Some((coords.0 + len, coords.1))
             }
-            Direction::Up if coords.1 > len => Some((coords.0, coords.1 - len)),
+            Direction::Up if coords.1 >= len => Some((coords.0, coords.1 - len)),
             Direction::Down if len <= max.1 && coords.1 <= max.1 - len => {
                 Some((coords.0, coords.1 + len))
             }
@@ -103,7 +103,11 @@ impl Direction {
         }
     }
 }
-fn neighbours(curr: &Node, max_size: &(usize, usize)) -> Option<Vec<Node>> {
+fn neighbours(
+    curr: &Node,
+    max_size: &(usize, usize),
+    weights: &Vec<Vec<usize>>,
+) -> Option<Vec<Node>> {
     (1..=3)
         .map(|i| {
             curr.dir
@@ -115,6 +119,11 @@ fn neighbours(curr: &Node, max_size: &(usize, usize)) -> Option<Vec<Node>> {
                             coords: c,
                             dir: d.clone(),
                             len: i,
+                            score: curr.score
+                                + (0..i)
+                                    .map(|j| d.subtract(&c, j, &max_size).unwrap())
+                                    .map(|(x, y)| weights[y][x])
+                                    .sum::<usize>(),
                         })
                     })
                 })
@@ -131,11 +140,32 @@ enum Direction {
     Up,
     Down,
 }
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 struct Node {
     coords: (usize, usize),
     dir: Direction,
     len: usize,
+    score: usize,
+}
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(
+            self.score
+                .cmp(&other.score)
+                .then_with(|| self.coords.cmp(&other.coords))
+                .then_with(|| self.len.cmp(&other.len))
+                .reverse(),
+        )
+    }
+}
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.score
+            .cmp(&other.score)
+            .then_with(|| self.coords.cmp(&other.coords))
+            .then_with(|| self.len.cmp(&other.len))
+            .reverse()
+    }
 }
 fn main() -> std::io::Result<()> {
     let mut file = File::open("input")?;
@@ -213,67 +243,40 @@ fn main() -> std::io::Result<()> {
     //         }
     //     }
     // }
-    let mut dist: HashMap<Node, usize> = HashMap::new();
-    dist.insert(
-        Node {
-            coords: (0, 0),
-            dir: Direction::Right,
-            len: 1,
-        },
-        0,
-    );
-    dist.insert(
-        Node {
-            coords: (0, 0),
-            dir: Direction::Down,
-            len: 1,
-        },
-        0,
-    );
+    let mut dist = BinaryHeap::new();
+    dist.push(Node {
+        coords: (0, 0),
+        dir: Direction::Right,
+        len: 1,
+        score: 0,
+    });
+    dist.push(Node {
+        coords: (0, 0),
+        dir: Direction::Down,
+        len: 1,
+        score: 0,
+    });
     let mut prev: HashMap<Node, Node> = HashMap::new();
-    let mut visited: HashSet<Node> = HashSet::new();
-    while dist.len() > 0 {
-        let dd = dist.clone();
-        let cur = dd.iter().min_by_key(|v| v.1).unwrap().clone();
+    let mut visited: HashSet<((usize, usize), Direction, usize)> = HashSet::new();
+    while let Some(cur) = dist.pop() {
         // println!("{:?}", cur);
-        dist.remove_entry(&cur.0);
-        if visited.contains(cur.0) {
+        if visited.contains(&(cur.coords, cur.dir, cur.len)) {
             continue;
         }
-        visited.insert(cur.0.clone());
-        if cur.0.coords == end {
-            println!("{}", cur.1);
+        visited.insert((cur.coords, cur.dir, cur.len));
+        if cur.coords == end {
+            println!("{}", cur.score);
             break;
         }
-        let neighs = neighbours(cur.0, &end);
+        let neighs = neighbours(&cur, &end, &weights);
         // println!("{:?}", neighs);
         if let Some(neighs) = neighs {
             for neighbour in neighs {
-                let cost = (0..neighbour.len)
-                    .map(|i| neighbour.dir.subtract(&neighbour.coords, i, &end).unwrap())
-                    .map(|(x, y)| weights[y][x])
-                    .sum::<usize>();
-                println!("{:?}: {:?} c:{:?}", cur, neighbour, cost);
-                let cost = cur.1 + cost;
+                // println!("{:?}: {:?}", cur, neighbour);
                 if neighbour.coords == end {
-                    println!("cost:{}", cost);
+                    println!("cost:{}", neighbour.score);
                 }
-
-                dist.entry(neighbour.clone())
-                    .and_modify(|v| {
-                        if cost < *v {
-                            *v = cost;
-                            // prev.entry(neighbour)
-                            //     .and_modify(|p| *p = *cur.0)
-                            //     .or_insert(*cur.0);
-                        }
-                    })
-                    .or_insert_with(|| {
-                        // prev.entry(neighbour)
-                        //     .and_modify(|p| *p = *cur.0)
-                        //     .or_insert(*cur.0);
-                        cost
-                    });
+                dist.push(neighbour);
             }
         }
     }
