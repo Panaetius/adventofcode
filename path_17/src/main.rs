@@ -108,7 +108,7 @@ fn neighbours(
     max_size: &(usize, usize),
     weights: &Vec<Vec<usize>>,
 ) -> Option<Vec<Node>> {
-    (1..=3)
+    (4..=10)
         .map(|i| {
             curr.dir
                 .orthogonal()
