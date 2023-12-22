@@ -1,3 +1,4 @@
+use num::integer::lcm;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -32,6 +33,9 @@ impl Node for OutputCont {
     fn add_edges(&self, _targets: Vec<String>, _nodes: &HashMap<String, RcNode>) {}
 
     fn incoming_edge(&self, _source: String) {}
+    fn get_name(&self) -> String {
+        self.0.borrow().name.clone()
+    }
 }
 #[derive(Debug)]
 struct Broadcast {
@@ -58,6 +62,9 @@ impl Node for BroadcastCont {
     }
 
     fn incoming_edge(&self, _source: String) {}
+    fn get_name(&self) -> String {
+        self.0.borrow().name.clone()
+    }
 }
 #[derive(Debug)]
 struct FlipFlop {
@@ -100,6 +107,9 @@ impl Node for FlipFlopCont {
     }
 
     fn incoming_edge(&self, _source: String) {}
+    fn get_name(&self) -> String {
+        self.0.borrow().name.clone()
+    }
 }
 #[derive(Debug)]
 struct Conjunction {
@@ -151,11 +161,16 @@ impl Node for ConjunctionCont {
         let mut s = self.0.borrow_mut();
         s.state.insert(source, false);
     }
+
+    fn get_name(&self) -> String {
+        self.0.borrow().name.clone()
+    }
 }
 trait Node: std::fmt::Debug {
     fn process(&self, signal: Pulse) -> Vec<Pulse>;
     fn add_edges(&self, targets: Vec<String>, nodes: &HashMap<String, RcNode>);
     fn incoming_edge(&self, source: String);
+    fn get_name(&self) -> String;
 }
 
 fn main() -> std::io::Result<()> {
@@ -229,9 +244,42 @@ fn main() -> std::io::Result<()> {
         let n = nodes.get(&name.to_string()).unwrap().clone();
         n.add_edges(out.iter().map(|s| s.to_string()).collect(), &nodes);
     }
-    let mut low_count: usize = 0;
-    let mut high_count: usize = 0;
-    for _ in 0..1000 {
+
+    // part 1
+    // let mut low_count: usize = 0;
+    // let mut high_count: usize = 0;
+    // for _ in 0..1000 {
+    //     let mut signals = VecDeque::from([Pulse::Low(
+    //         "".to_string(),
+    //         broadcast.clone().unwrap().clone(),
+    //     )]);
+    //     while let Some(signal) = signals.pop_front() {
+    //         match signal.clone() {
+    //             Pulse::Low(_, node) => {
+    //                 low_count += 1;
+    //                 for signal in node.process(signal) {
+    //                     signals.push_back(signal);
+    //                 }
+    //             }
+    //             Pulse::High(_, node) => {
+    //                 high_count += 1;
+    //                 for signal in node.process(signal) {
+    //                     signals.push_back(signal);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // println!("{}:{}", low_count, high_count);
+    // println!("{}", low_count * high_count);
+    println!("{:?}", nodes.get(&"rx".to_string()));
+    let mut count: usize = 0;
+    let mut found: Vec<Option<usize>> = vec![None, None, None, None];
+    while true {
+        count += 1;
+        // if count % 10_000 == 0 {
+        //     println!("count {}", count);
+        // }
         let mut signals = VecDeque::from([Pulse::Low(
             "".to_string(),
             broadcast.clone().unwrap().clone(),
@@ -239,13 +287,56 @@ fn main() -> std::io::Result<()> {
         while let Some(signal) = signals.pop_front() {
             match signal.clone() {
                 Pulse::Low(_, node) => {
-                    low_count += 1;
+                    if node.get_name() == "rx".to_string() {
+                        break;
+                    }
                     for signal in node.process(signal) {
                         signals.push_back(signal);
                     }
                 }
-                Pulse::High(_, node) => {
-                    high_count += 1;
+                Pulse::High(inp, node) => {
+                    if inp == "jg".to_string() {
+                        if let None = found[0] {
+                            found[0] = Some(count);
+                            if found.iter().all(|v| v.is_some()) {
+                                println!("found");
+
+                                let cycle = found.iter().fold(1, |acc, val| lcm(acc, val.unwrap()));
+                                println!("{}", cycle);
+                                break;
+                            }
+                        }
+                    } else if inp == "rh".to_string() {
+                        if let None = found[1] {
+                            found[1] = Some(count);
+                            if found.iter().all(|v| v.is_some()) {
+                                println!("found");
+                                let cycle = found.iter().fold(1, |acc, val| lcm(acc, val.unwrap()));
+                                println!("{}", cycle);
+                                break;
+                            }
+                        }
+                    } else if inp == "jm".to_string() {
+                        if let None = found[2] {
+                            found[2] = Some(count);
+                            if found.iter().all(|v| v.is_some()) {
+                                println!("found");
+                                let cycle = found.iter().fold(1, |acc, val| lcm(acc, val.unwrap()));
+                                println!("{}", cycle);
+                                break;
+                            }
+                        }
+                    } else if inp == "hf".to_string() {
+                        if let None = found[3] {
+                            found[3] = Some(count);
+                            if found.iter().all(|v| v.is_some()) {
+                                println!("found");
+                                let cycle = found.iter().fold(1, |acc, val| lcm(acc, val.unwrap()));
+                                println!("{}", cycle);
+                                break;
+                            }
+                        }
+                    }
                     for signal in node.process(signal) {
                         signals.push_back(signal);
                     }
@@ -253,8 +344,7 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
-    println!("{}:{}", low_count, high_count);
-    println!("{}", low_count * high_count);
+    println!("{}", count);
 
     Ok(())
 }
