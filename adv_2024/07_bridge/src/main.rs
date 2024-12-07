@@ -48,12 +48,18 @@ fn recurse_calc(curr: u64, slice: &[u64], target: u64) -> Option<u64> {
     if let Some(nn) = nnext {
         if nn <= target {
             res = recurse_calc(nn, rest, target);
+            if res.is_some() {
+                return res;
+            }
         }
     }
     let nnext = curr.checked_mul(next);
     if let Some(nn) = nnext {
         if nn <= target {
             res = res.or(recurse_calc(nn, rest, target));
+            if res.is_some() {
+                return res;
+            }
         }
     }
     let nnext = (curr * 10u64.pow(next.ilog10() + 1)).checked_add(next);
